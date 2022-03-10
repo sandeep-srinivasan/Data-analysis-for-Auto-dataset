@@ -1,0 +1,276 @@
+---
+title: 'Auto dataset'
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+1. a. 
+
+```{r}
+library("ISLR")
+names(Auto)
+summary(Auto$mpg)
+mpgmed = median(Auto$mpg)
+mpg01 <- as.numeric(Auto$mpg > mpgmed )
+```
+```{r}
+df = data.frame(mpg01, Auto)
+dim(df)
+```
+1. b.
+
+```{r}
+df_cor = cor(df[,c(-2,-10)])
+library(corrplot)
+corrplot(df_cor)
+pairs(df[,c(-2,-10)])
+pairs
+```
+```{r}
+boxplot(cylinders~mpg01, main = "cylinders v/s mpg01", data = df)
+boxplot(displacement~mpg01, main = "displacement v/s mpg01", data = df)
+boxplot(horsepower~mpg01, main = "horsepower v/s mpg01", data = df)
+boxplot(weight~mpg01, main = "weight v/s mpg01", data = df)
+boxplot(acceleration~mpg01, main = "acceleration v/s mpg01", data = df)
+boxplot(year~mpg01, main = "year v/s mpg01", data = df)
+boxplot(origin~mpg01, main = "origin v/s mpg01", data = df)
+```
+From the correlation and boxplots, it can be seen that the variables which strongly help in predicting mpg01 are cylinders, displacement, horsepower, weight. The variables which also in predicting mpg01 are acceleration, year and origin.
+
+1. c.
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(df), size = 0.75*nrow(df))
+test <- (1:392)[-train]
+table(df$mpg01[train])
+train.y <- df$mpg01[train]
+test.y <- df$mpg01[test]
+```
+The original dataset, df is split into training and testing set in the ratio of 3:1 respectively.
+
+1. d.
+
+LDA
+
+Model fitting
+
+```{r}
+library(MASS)
+lda.fit <- lda(mpg01 ~ cylinders + displacement + horsepower + weight + acceleration + year + origin,
+               data = df, subset = train)
+lda.fit
+```
+Training error rate
+
+```{r}
+#prediction over training data
+lda.pred.tr <- predict(lda.fit)
+names(lda.pred.tr)
+```
+```{r}
+lda.pred.tr$posterior[1:3,]
+```
+```{r}
+#confusion matrix
+table(lda.pred.tr$class, train.y)
+```
+```{r}
+#training error rate
+mean(lda.pred.tr$class != train.y)
+```
+```{r}
+#prediction over training data
+lda.pred <- predict(lda.fit, df[test,])
+
+#confusion matrix
+table(lda.pred$class, test.y)
+```
+
+```{r}
+#test error rate
+mean(lda.pred$class != test.y)
+```
+
+1.e.
+
+QDA
+
+Model fitting
+
+```{r}
+qda.fit <- qda(mpg01 ~ cylinders + displacement + horsepower + weight + acceleration + year + origin,
+               data = df, subset = train)
+qda.fit
+```
+Training error rate
+
+```{r}
+#prediction over training data
+qda.pred.tr <- predict(qda.fit)
+names(qda.pred.tr)
+```
+
+```{r}
+qda.pred.tr$posterior[1:3,]
+```
+
+```{r}
+#confusion matrix
+table(qda.pred.tr$class, train.y)
+```
+
+```{r}
+#training error rate
+mean(qda.pred.tr$class != train.y)
+```
+
+```{r}
+#prediction over training data
+qda.pred <- predict(qda.fit, df[test,])
+
+#confusion matrix
+table(qda.pred$class, test.y)
+```
+
+```{r}
+#test error rate
+mean(qda.pred$class != test.y)
+```
+
+1.f.
+
+Logistic Regression
+
+Model fitting
+
+```{r}
+model.fit <- glm(mpg01 ~ cylinders + displacement + horsepower + weight + acceleration + year + origin,
+               data = df, subset = train)
+summary(model.fit)
+```
+Training error rate
+
+```{r}
+#estimate posterior probabilities for the training data
+df.probs.tr <- fitted(model.fit)
+df.probs.tr <- predict(model.fit, type = "response")
+
+#classify based on posterior probability
+pred.tr <- ifelse(df.probs.tr > 0.5, "1", "0")
+
+#confusion matrix
+table(pred.tr, train.y)
+```
+```{r}
+#training error rate
+mean(pred.tr != train.y)
+```
+```{r}
+#estimate posterior probabilities for the testing data
+df.probs <- predict(model.fit, newdata = df[test,], type = "response")
+#classify based on the posterior probabilities
+pred.test <- ifelse(df.probs > 0.5, "1", "0")
+#confusion matrix
+table(pred.test, test.y)
+```
+```{r}
+#test error rate
+mean(pred.test != test.y)
+```
+
+1.g.
+
+KNN
+
+```{r}
+library(class)
+
+# for reproducibility in case there are tied observations for nearest neighbors
+set.seed(2)
+
+# define the list of predictors
+var.list <- c("cylinders", "displacement", "horsepower", "weight", "acceleration", "year", "origin")
+
+# define X matrix for training and testing
+train.X <- df[train, var.list]
+test.X <- df[test, var.list]
+
+```
+
+```{r}
+#1-NN
+# prediction for test data
+knn.pred <- knn(train.X, test.X, train.y, k = 1)
+
+# confusion matrix
+table(knn.pred, test.y)
+```
+```{r}
+#test error rate of 1-NN
+mean(knn.pred != test.y)
+```
+```{r}
+#10-NN
+# prediction for test data
+knn.pred.10 <- knn(train.X, test.X, train.y, k = 10)
+
+# confusion matrix
+table(knn.pred.10, test.y)
+```
+
+```{r}
+#test error rate of 1-NN
+mean(knn.pred.10 != test.y)
+```
+```{r}
+kmax <- 10
+# initialize error rates to zero
+knn.train.error <- rep(0, kmax)
+knn.test.error <- rep(0, kmax)
+# vary k from 1 to kmax
+for (i in 1:kmax)
+{
+# prediction for training data
+knn.pred.tr <- knn(train.X, train.X, train.y, k = i)
+# training error rate
+knn.train.error[i] <- mean(knn.pred.tr != train.y)
+# prediction for test data
+knn.pred <- knn(train.X, test.X, train.y, k = i)
+# test error rate
+knn.test.error[i] <- mean(knn.pred != test.y)
+}
+```
+
+```{r}
+knn.test.error
+```
+By looking at the values for k=1 to 10, we find that for K=7, the value of the test error is least and hence K=7 seems to perform best on this data set.
+
+2. g.
+
+```{r}
+n = 1:100000
+plot(n, 1 - (1 - 1/n)^n, typ = "l", log = "x")
+abline(h = 1 - exp(-1), lty = "dotted")
+
+```
+For larger values of n, when the limit of (1 - 1/n)^n is applied as n goes to infinity, it can be seen that the value turns out to be approximately equal to exp(-1). So the probability that the jth observation is in the bootstrap sample, whwn n is large is 1 - exp(-1), which is approximately equal to 0.632.
+That is the reason why a straight line is added with the expression exp(-1) in the plot.
+
+And this reinstates that fact of bootstrap being called 0.632 Bootstrap, since the observation will be in the bootstrap sample 63.2% of the times for large values of n.
+
+2.h.
+
+```{r}
+store=rep (NA , 10000)
+for (i in 1:10000) {
+store[i]=sum(sample (1:100 , rep =TRUE)==4) >0
+}
+mean(store)
+```
+Similar to the above question, we see that for larger values of n, the mean(store) or the probability that the jth observation being chosen is 62.93% which is close to 63.2%.
+
+
